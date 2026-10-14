@@ -49,6 +49,13 @@ public class DynamicIslandWindow extends JWindow {
     private void initInteractions() {
         JPopupMenu menu = new JPopupMenu();
 
+        JMenuItem bgStyleItem = new JMenuItem("Стиль фона: Черный / Liquid Glass (Шейдер)");
+        bgStyleItem.addActionListener(e -> {
+            com.dynamicisland.render.LiquidGlassRenderer.toggleBackgroundStyle();
+            System.out.println("[App] Background style toggled to: " + com.dynamicisland.render.LiquidGlassRenderer.getBackgroundStyle());
+        });
+        menu.add(bgStyleItem);
+
         JMenuItem themeTestItem = new JMenuItem("Тест цвета: Переключить тему (Светлая / Темная / Авто)");
         themeTestItem.addActionListener(e -> {
             BrightnessDetector.toggleThemeTest();

@@ -8,6 +8,7 @@ import com.dynamicisland.model.NotificationInfo;
 import com.dynamicisland.render.EqualizerVisualizer;
 import com.dynamicisland.render.FontGrid64Renderer;
 import com.dynamicisland.render.FontManager;
+import com.dynamicisland.render.LiquidGlassRenderer;
 import com.dynamicisland.render.PhotoGrid64Renderer;
 import com.dynamicisland.render.SvgRenderer;
 import com.dynamicisland.util.BrightnessDetector;
@@ -247,15 +248,10 @@ public class DynamicIslandPanel extends JPanel {
     }
 
     private void drawIslandCapsule(Graphics2D g, float x, float y, float w, float h) {
-        // Solid black capsule
-        g.setColor(Color.BLACK);
-        RoundRectangle2D.Float capsule = new RoundRectangle2D.Float(x, y, w, h, h, h);
-        g.fill(capsule);
+        // Render capsule background (Solid Black or Liquid Glass Shader)
+        LiquidGlassRenderer.renderBackground(g, x, y, w, h);
 
-        // Subtle elegant border
-        g.setColor(new Color(255, 255, 255, 20));
-        g.setStroke(new BasicStroke(0.8f));
-        g.draw(capsule);
+        RoundRectangle2D.Float capsule = new RoundRectangle2D.Float(x, y, w, h, h, h);
 
         // Clip inside capsule
         Graphics2D gClip = (Graphics2D) g.create();
