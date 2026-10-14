@@ -6,7 +6,9 @@ import com.dynamicisland.model.MediaInfo;
 import com.dynamicisland.model.NetworkStatus;
 import com.dynamicisland.model.NotificationInfo;
 import com.dynamicisland.render.EqualizerVisualizer;
+import com.dynamicisland.render.FontGrid64Renderer;
 import com.dynamicisland.render.FontManager;
+import com.dynamicisland.render.PhotoGrid64Renderer;
 import com.dynamicisland.render.SvgRenderer;
 import com.dynamicisland.util.BrightnessDetector;
 
@@ -33,8 +35,8 @@ public class DynamicIslandPanel extends JPanel {
 
     // Fixed static height (only width animates)
     private static final float FIXED_HEIGHT = 35f;
-    private float currentWidth = 160f;
-    private float targetWidth = 160f;
+    private float currentWidth = 120f;
+    private float targetWidth = 120f;
 
     // Animations: Slide and Fade
     private float contentAlpha = 1.0f;
@@ -77,8 +79,8 @@ public class DynamicIslandPanel extends JPanel {
             }
         }
 
-        // 2. Interpolate ONLY width (height remains strictly fixed)
-        float lerpSpeed = 0.16f;
+        // 2. Interpolate ONLY width (smooth easing)
+        float lerpSpeed = 0.18f;
         currentWidth += (targetWidth - currentWidth) * lerpSpeed;
 
         // 3. Interpolate content fade & slide
@@ -122,7 +124,19 @@ public class DynamicIslandPanel extends JPanel {
     public void setNotification(NotificationInfo notif) {
         this.currentNotification = notif;
         notificationExpireTime = System.currentTimeMillis() + 4500;
-        SoundPlayer.playDing();
+
+        // Mute check: do NOT play sound if Telegram message is silent, or Discord message is background
+        boolean shouldPlaySound = true;
+        if (notif.isTelegram() && notif.isSilent()) {
+            shouldPlaySound = false;
+        }
+        if (notif.isDiscord() && !notif.isMention()) {
+            shouldPlaySound = false;
+        }
+
+        if (shouldPlaySound) {
+            SoundPlayer.playDing();
+        }
         setMode(IslandMode.NOTIFICATION);
     }
 
@@ -134,7 +148,7 @@ public class DynamicIslandPanel extends JPanel {
         if (this.currentMode != newMode) {
             this.currentMode = newMode;
             this.contentAlpha = 0.0f;
-            this.slideX = 20f;
+            this.slideX = 18f;
             this.targetSlideX = 0f;
             this.targetContentAlpha = 1.0f;
         }
@@ -143,22 +157,23 @@ public class DynamicIslandPanel extends JPanel {
 
     private void updateTargetDimensions() {
         switch (currentMode) {
-            case IDLE -> targetWidth = 165f;
+            case IDLE -> targetWidth = 110f;
             case MUSIC -> {
                 String title = (currentMedia != null && !currentMedia.getTitle().isEmpty()) ? currentMedia.getTitle() : "Музыка";
                 Font font = FontManager.getBold(13f);
                 FontMetrics fm = getFontMetrics(font);
                 int titleW = fm.stringWidth(title);
-                int visibleTextW = Math.min(200, titleW);
+                int visibleTextW = Math.min(180, titleW);
 
-                float coverSize = 18f; // 1.5x smaller (was 26-28f)
-                float gapCoverText = 8f;
-                float gapTextEq = 8f; // tight gap between text and equalizer
-                float eqW = equalizer.getTotalWidth();
-                float paddingLeft = 9f;
-                float paddingRight = 11f;
+                float coverSize = 18f;
+                float gapCoverText = 7f;
+                float gapTextEq = 7f;
+                float eqW = equalizer.getTotalWidth(); // 17.8f
+                float paddingLeft = 10f;
+                float paddingRight = 10f;
 
-                targetWidth = Math.max(180f, paddingLeft + coverSize + gapCoverText + visibleTextW + gapTextEq + eqW + paddingRight);
+                // Tightly wraps without extra empty tails!
+                targetWidth = paddingLeft + coverSize + gapCoverText + visibleTextW + gapTextEq + eqW + paddingRight;
             }
             case NOTIFICATION -> {
                 String app = (currentNotification != null) ? currentNotification.getAppName() : "Уведомление";
@@ -168,10 +183,10 @@ public class DynamicIslandPanel extends JPanel {
                 String full = msg.isEmpty() ? app : (app + " • " + msg);
                 Font font = FontManager.getBold(13f);
                 FontMetrics fm = getFontMetrics(font);
-                int textW = Math.min(230, fm.stringWidth(full));
+                int textW = Math.min(220, fm.stringWidth(full));
 
                 float iconSize = 18f;
-                targetWidth = Math.max(220f, 9f + iconSize + 8f + textW + 14f);
+                targetWidth = 10f + iconSize + 8f + textW + 12f;
             }
         }
     }
@@ -181,7 +196,7 @@ public class DynamicIslandPanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
 
-        // Ultra-crisp rendering hints (no pixelation or blur)
+        // 64-grid rendering hints for ultra-smooth anti-aliased output
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
@@ -200,20 +215,19 @@ public class DynamicIslandPanel extends JPanel {
         boolean isLightBg = BrightnessDetector.isLightBackground();
         Color statusColor = BrightnessDetector.getAdaptiveColor(DARK_THEME_COLOR, LIGHT_THEME_COLOR);
 
-        // 1. Draw Left Status Area: Wi-Fi ONLY (Bigger icon, no airplane)
+        // 1. Draw Left Status Area: Wi-Fi ONLY (24x24, no airplane)
         drawLeftStatus(g2, islandX, islandY + (islandH / 2f), isLightBg);
 
-        // 2. Draw Dynamic Island Capsule (Solid black, no transparency)
+        // 2. Draw Dynamic Island Capsule (Solid black, strictly balanced symmetry)
         drawIslandCapsule(g2, islandX, islandY, islandW, islandH);
 
-        // 3. Draw Right Status Area: Clock Time (Nunito-SemiBold, adaptive color)
+        // 3. Draw Right Status Area: Clock Time (Nunito-SemiBold, 64-grid rendered)
         drawRightStatus(g2, islandX + islandW, islandY + (islandH / 2f), statusColor);
 
         g2.dispose();
     }
 
     private void drawLeftStatus(Graphics2D g, float islandLeftX, float centerY, boolean isLightBg) {
-        // Bigger Wi-Fi icon (24x24) and no airplane
         float iconSize = 24f;
         float startX = islandLeftX - iconSize - 16f;
 
@@ -223,25 +237,22 @@ public class DynamicIslandPanel extends JPanel {
 
     private void drawRightStatus(Graphics2D g, float islandRightX, float centerY, Color textColor) {
         String timeStr = LocalTime.now().format(timeFormatter);
-        // Nunito-SemiBold font for time
         Font font = FontManager.getSemiBold(14.5f);
-        g.setFont(font);
-        g.setColor(textColor);
-
-        FontMetrics fm = g.getFontMetrics();
+        FontMetrics fm = g.getFontMetrics(font);
         float textX = islandRightX + 16f;
         float textY = centerY + (fm.getAscent() / 2f) - 2f;
 
-        g.drawString(timeStr, textX, textY);
+        // 64-grid super-sampled font rendering
+        FontGrid64Renderer.drawString64(g, timeStr, font, textColor, textX, textY);
     }
 
     private void drawIslandCapsule(Graphics2D g, float x, float y, float w, float h) {
-        // Solid black rounded pill
+        // Solid black capsule
         g.setColor(Color.BLACK);
         RoundRectangle2D.Float capsule = new RoundRectangle2D.Float(x, y, w, h, h, h);
         g.fill(capsule);
 
-        // Subtle dark rim
+        // Subtle elegant border
         g.setColor(new Color(255, 255, 255, 20));
         g.setStroke(new BasicStroke(0.8f));
         g.draw(capsule);
@@ -267,95 +278,74 @@ public class DynamicIslandPanel extends JPanel {
     }
 
     private void drawMusicContent(Graphics2D g, float x, float y, float w, float h, float centerY) {
-        float paddingLeft = 9f;
-        float coverSize = 18f; // Reduced in size by 1.5x
+        float paddingLeft = 10f;
+        float paddingRight = 10f;
+        float coverSize = 18f;
 
-        // 1. Album Cover Art
+        // 1. Album Cover Art with 64-grid progressive downsampling
         float coverX = x + paddingLeft;
         float coverY = centerY - (coverSize / 2f);
 
         BufferedImage coverImg = (currentMedia != null) ? currentMedia.getCover() : null;
-        if (coverImg != null) {
-            Graphics2D gCover = (Graphics2D) g.create();
-            RoundRectangle2D.Float coverClip = new RoundRectangle2D.Float(coverX, coverY, coverSize, coverSize, 5, 5);
-            gCover.clip(coverClip);
-            gCover.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            gCover.drawImage(coverImg, (int) coverX, (int) coverY, (int) coverSize, (int) coverSize, null);
-            gCover.dispose();
-        } else {
-            g.setColor(new Color(45, 45, 50));
-            g.fill(new RoundRectangle2D.Float(coverX, coverY, coverSize, coverSize, 5, 5));
-            g.setColor(new Color(255, 45, 85));
-            g.fillOval((int) coverX + 5, (int) coverY + 5, 8, 8);
-        }
+        PhotoGrid64Renderer.render64GridPhoto(g, coverImg, coverX, coverY, coverSize, 4.5f);
 
-        // 2. Track Title (Nunito-Bold, White)
+        // 2. Equalizer placed with exact paddingRight from the right edge
+        float eqW = equalizer.getTotalWidth();
+        float eqX = x + w - paddingRight - eqW;
+        equalizer.render(g, eqX, centerY);
+
+        // 3. Track Title (Nunito-Bold, 64-grid rendered)
         String title = (currentMedia != null && !currentMedia.getTitle().isEmpty())
                 ? currentMedia.getTitle()
                 : "Воспроизведение";
 
         Font font = FontManager.getBold(13f);
-        g.setFont(font);
-        g.setColor(Color.WHITE);
-
-        FontMetrics fm = g.getFontMetrics();
+        FontMetrics fm = g.getFontMetrics(font);
         int fullTitleW = fm.stringWidth(title);
-        int maxVisibleW = 200;
-        int textW = Math.min(maxVisibleW, fullTitleW);
 
-        float textX = coverX + coverSize + 8f;
+        float textX = coverX + coverSize + 7f;
+        float availableTextW = Math.max(10f, eqX - textX - 7f);
         float textY = centerY + (fm.getAscent() / 2f) - 2f;
 
         Graphics2D gText = (Graphics2D) g.create();
-        gText.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        gText.clipRect((int) textX, (int) y, textW, (int) h);
+        gText.clipRect((int) textX, (int) y, (int) availableTextW, (int) h);
 
-        if (fullTitleW > maxVisibleW) {
-            float loopW = fullTitleW + 35f;
+        if (fullTitleW > availableTextW + 5) {
+            float loopW = fullTitleW + 30f;
             float curOffset = marqueeOffset % loopW;
-            gText.drawString(title, textX - curOffset, textY);
-            gText.drawString(title, textX - curOffset + loopW, textY);
+            FontGrid64Renderer.drawString64(gText, title, font, Color.WHITE, textX - curOffset, textY);
+            FontGrid64Renderer.drawString64(gText, title, font, Color.WHITE, textX - curOffset + loopW, textY);
         } else {
-            gText.drawString(title, textX, textY);
+            FontGrid64Renderer.drawString64(gText, title, font, Color.WHITE, textX, textY);
         }
         gText.dispose();
-
-        // 3. Equalizer (tight gap after title, thin bars with cube proportions)
-        float gapTextEq = 8f; // small, compact gap
-        float eqX = textX + textW + gapTextEq;
-        equalizer.render(g, eqX, centerY);
     }
 
     private void drawNotificationContent(Graphics2D g, float x, float y, float w, float h, float centerY) {
-        float paddingLeft = 9f;
+        float paddingLeft = 10f;
         float iconSize = 18f;
 
         float iconX = x + paddingLeft;
         float iconY = centerY - (iconSize / 2f);
 
-        // 1. App Icon
+        // 1. App Icon with 64-grid multi-step downsampling
         BufferedImage appIcon = (currentNotification != null) ? currentNotification.getAppIcon() : null;
         if (appIcon != null) {
-            Graphics2D gIcon = (Graphics2D) g.create();
-            RoundRectangle2D.Float iconClip = new RoundRectangle2D.Float(iconX, iconY, iconSize, iconSize, 5, 5);
-            gIcon.clip(iconClip);
-            gIcon.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            gIcon.drawImage(appIcon, (int) iconX, (int) iconY, (int) iconSize, (int) iconSize, null);
-            gIcon.dispose();
+            PhotoGrid64Renderer.render64GridPhoto(g, appIcon, iconX, iconY, iconSize, 4.5f);
         } else {
             g.setColor(new Color(0, 122, 255));
-            g.fill(new RoundRectangle2D.Float(iconX, iconY, iconSize, iconSize, 5, 5));
+            g.fill(new RoundRectangle2D.Float(iconX, iconY, iconSize, iconSize, 4.5f, 4.5f));
             g.setColor(Color.WHITE);
-            g.setFont(FontManager.getBold(11f));
+            Font f = FontManager.getBold(11f);
             String firstLetter = (currentNotification != null && !currentNotification.getAppName().isEmpty())
                     ? currentNotification.getAppName().substring(0, 1).toUpperCase()
                     : "!";
-            g.drawString(firstLetter, iconX + 5f, centerY + 4f);
+            FontGrid64Renderer.drawString64(g, firstLetter, f, Color.WHITE, iconX + 5f, centerY + 4f);
         }
 
-        // 2. App Name & Notification Message
+        // 2. App Name & Notification Message with 64-grid font rendering
         float textX = iconX + iconSize + 8f;
-        float maxTextW = x + w - textX - 12f;
+        float maxTextW = x + w - textX - 10f;
 
         String appName = (currentNotification != null) ? currentNotification.getAppName() : "Уведомление";
         String extraText = (currentNotification != null && !currentNotification.getTitle().isEmpty())
@@ -365,16 +355,12 @@ public class DynamicIslandPanel extends JPanel {
         String displayStr = extraText.isEmpty() ? appName : (appName + " • " + extraText);
 
         Font font = FontManager.getBold(13f);
-        g.setFont(font);
-        g.setColor(Color.WHITE);
-
-        FontMetrics fm = g.getFontMetrics();
+        FontMetrics fm = g.getFontMetrics(font);
         float textY = centerY + (fm.getAscent() / 2f) - 2f;
 
         Graphics2D gText = (Graphics2D) g.create();
-        gText.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         gText.clipRect((int) textX, (int) y, (int) maxTextW, (int) h);
-        gText.drawString(displayStr, textX, textY);
+        FontGrid64Renderer.drawString64(gText, displayStr, font, Color.WHITE, textX, textY);
         gText.dispose();
     }
 
@@ -384,14 +370,14 @@ public class DynamicIslandPanel extends JPanel {
 
         // Camera lens
         g.setColor(new Color(18, 18, 22));
-        g.fillOval((int) (x + w - 22f), (int) (centerY - (dotSize / 2f)), (int) dotSize, (int) dotSize);
+        g.fillOval((int) (x + w - 20f), (int) (centerY - (dotSize / 2f)), (int) dotSize, (int) dotSize);
 
         // Reflection
         g.setColor(new Color(25, 30, 50));
-        g.fillOval((int) (x + w - 20f), (int) (centerY - 2.5f), 3, 3);
+        g.fillOval((int) (x + w - 18f), (int) (centerY - 2.5f), 3, 3);
 
         // Sensor
         g.setColor(new Color(14, 14, 18));
-        g.fillRoundRect((int) (x + 14f), (int) (centerY - 3f), (int) sensorW, 6, 6, 6);
+        g.fillRoundRect((int) (x + 12f), (int) (centerY - 3f), (int) sensorW, 6, 6, 6);
     }
 }

@@ -145,46 +145,74 @@ while ($true) {
         if ($listener) {
             $notifs = AwaitTask ($listener.GetNotificationsAsync([Windows.UI.Notifications.NotificationKinds]::Toast)) ([System.Collections.Generic.IReadOnlyList[Windows.UI.Notifications.UserNotification]])
             if ($notifs -and $notifs.Count -gt 0) {
-                $latest = $notifs[$notifs.Count - 1]
-                if ($latest.Id -ne $lastNotifId) {
-                    $lastNotifId = $latest.Id
-                    $appName = $latest.AppInfo.DisplayInfo.DisplayName
-                    $titleText = ""
-                    $bodyText = ""
-                    
-                    $binding = $latest.Notification.Visual.GetBinding([Windows.UI.Notifications.KnownNotificationBindings]::ToastGeneric)
-                    if ($binding) {
-                        $elements = $binding.GetTextElements()
-                        if ($elements.Count -gt 0) { $titleText = $elements[0].Text }
-                        if ($elements.Count -gt 1) { $bodyText = $elements[1].Text }
-                    }
+                foreach ($latest in $notifs) {
+                    if ($latest.Id -gt $lastNotifId) {
+                        $lastNotifId = $latest.Id
+                        $appName = $latest.AppInfo.DisplayInfo.DisplayName
+                        $titleText = ""
+                        $bodyText = ""
+                        
+                        $binding = $latest.Notification.Visual.GetBinding([Windows.UI.Notifications.KnownNotificationBindings]::ToastGeneric)
+                        if ($binding) {
+                            $elements = $binding.GetTextElements()
+                            if ($elements.Count -gt 0) { $titleText = $elements[0].Text }
+                            if ($elements.Count -gt 1) { $bodyText = $elements[1].Text }
+                        }
 
-                    $hasLogo = $false
-                    try {
-                        $logoRef = $latest.AppInfo.DisplayInfo.GetLogo([Windows.Foundation.Size]::new(32, 32))
-                        if ($logoRef) {
-                            $logoStream = AwaitTask ($logoRef.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-                            $logoBytes = [NativeStreamHelper]::ReadRandomAccessStream($logoStream)
-                            if ($logoBytes -and $logoBytes.Length -gt 0) {
-                                [System.IO.File]::WriteAllBytes($logoPath, $logoBytes)
-                                $hasLogo = $true
+                        # Immediately remove notification from Windows toast so it only shows in Dynamic Island!
+                        try {
+                            $listener.RemoveNotification($latest.Id)
+                        } catch {}
+
+                        # Telegram detection & silent check
+                        $isTelegram = ($appName -like "*Telegram*")
+                        $isSilent = $false
+                        if ($isTelegram) {
+                            if ($titleText -like "*🔕*" -or $bodyText -like "*🔕*" -or $titleText -like "*без звука*" -or $bodyText -like "*без звука*" -or $titleText -like "*[Muted]*") {
+                                $isSilent = $true
+                            }
+                            try {
+                                if ($latest.Notification.SuppressPopup -eq $true) {
+                                    $isSilent = $true
+                                }
+                            } catch {}
+                        }
+
+                        # Discord detection & mention check
+                        $isDiscord = ($appName -like "*Discord*")
+                        $isMention = $false
+                        if ($isDiscord) {
+                            if ($titleText -like "*@*" -or $bodyText -like "*@*" -or $titleText -like "*(DM)*" -or $titleText -like "*упомянул*" -or $bodyText -like "*упомянул*" -or $titleText -notmatch '#') {
+                                $isMention = $true
                             }
                         }
-                    } catch {}
 
-                    $notifJson = @{
-                        type = "notification"
-                        appName = $appName
-                        title = $titleText
-                        text = $bodyText
-                        iconPath = if ($hasLogo) { $logoPath } else { "" }
-                    } | ConvertTo-Json -Compress
-                    Write-Host "EVENT:$notifJson"
+                        $hasLogo = $false
+                        try {
+                            $logoRef = $latest.AppInfo.DisplayInfo.GetLogo([Windows.Foundation.Size]::new(32, 32))
+                            if ($logoRef) {
+                                $logoStream = AwaitTask ($logoRef.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
+                                $logoBytes = [NativeStreamHelper]::ReadRandomAccessStream($logoStream)
+                                if ($logoBytes -and $logoBytes.Length -gt 0) {
+                                    [System.IO.File]::WriteAllBytes($logoPath, $logoBytes)
+                                    $hasLogo = $true
+                                }
+                            }
+                        } catch {}
 
-                    # Dismiss system toast so dynamic island handles it exclusively
-                    try {
-                        $listener.RemoveNotification($latest.Id)
-                    } catch {}
+                        $notifJson = @{
+                            type = "notification"
+                            appName = $appName
+                            title = $titleText
+                            text = $bodyText
+                            iconPath = if ($hasLogo) { $logoPath } else { "" }
+                            isTelegram = $isTelegram
+                            isSilent = $isSilent
+                            isDiscord = $isDiscord
+                            isMention = $isMention
+                        } | ConvertTo-Json -Compress
+                        Write-Host "EVENT:$notifJson"
+                    }
                 }
             }
         }
@@ -223,5 +251,5 @@ while ($true) {
         }
     } catch {}
 
-    Start-Sleep -Milliseconds 400
+    Start-Sleep -Milliseconds 150
 }

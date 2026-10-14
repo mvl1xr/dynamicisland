@@ -143,8 +143,13 @@ public class WindowsBridgeService {
                         }
                     }
 
-                    System.out.println("[App] Notification received from " + appName + ": " + notifTitle + " - " + text);
-                    NotificationInfo notif = new NotificationInfo(appName, notifTitle, text, appIcon);
+                    boolean isTelegram = obj.has("isTelegram") && obj.get("isTelegram").getAsBoolean();
+                    boolean isSilent = obj.has("isSilent") && obj.get("isSilent").getAsBoolean();
+                    boolean isDiscord = obj.has("isDiscord") && obj.get("isDiscord").getAsBoolean();
+                    boolean isMention = obj.has("isMention") && obj.get("isMention").getAsBoolean();
+
+                    System.out.println("[App] Notification received from " + appName + ": " + notifTitle + " - " + text + " (tg=" + isTelegram + ", silent=" + isSilent + ", dc=" + isDiscord + ", mention=" + isMention + ")");
+                    NotificationInfo notif = new NotificationInfo(appName, notifTitle, text, appIcon, isTelegram, isSilent, isDiscord, isMention);
                     for (Listener l : listeners) {
                         l.onNotificationReceived(notif);
                     }
