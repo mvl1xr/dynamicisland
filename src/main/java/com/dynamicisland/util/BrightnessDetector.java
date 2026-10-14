@@ -9,7 +9,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class BrightnessDetector {
+    public enum ThemeMode {
+        AUTO,
+        FORCE_DARK,  // White icons/text
+        FORCE_LIGHT  // Black icons/text
+    }
+
     private static Robot robot;
+    private static volatile ThemeMode currentMode = ThemeMode.AUTO;
     private static volatile boolean isLightBackground = false;
     private static float currentFade = 0.0f; // 0.0 = dark background (white icons), 1.0 = light background (black icons)
     private static float targetFade = 0.0f;
@@ -32,19 +39,30 @@ public class BrightnessDetector {
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
+                if (currentMode == ThemeMode.FORCE_DARK) {
+                    isLightBackground = false;
+                    targetFade = 0.0f;
+                    return;
+                }
+                if (currentMode == ThemeMode.FORCE_LIGHT) {
+                    isLightBackground = true;
+                    targetFade = 1.0f;
+                    return;
+                }
+
                 if (leftSamplePoint == null || rightSamplePoint == null) return;
 
-                // Sample points around left and right areas
+                // Sample points around left and right areas outside the capsule
                 double totalLuminance = 0;
                 int count = 0;
 
                 Point[] sampleLocs = new Point[] {
                     new Point(leftSamplePoint.x, leftSamplePoint.y),
-                    new Point(leftSamplePoint.x - 15, leftSamplePoint.y),
-                    new Point(leftSamplePoint.x + 15, leftSamplePoint.y),
+                    new Point(leftSamplePoint.x - 20, leftSamplePoint.y),
+                    new Point(leftSamplePoint.x, leftSamplePoint.y + 40),
                     new Point(rightSamplePoint.x, rightSamplePoint.y),
-                    new Point(rightSamplePoint.x - 15, rightSamplePoint.y),
-                    new Point(rightSamplePoint.x + 15, rightSamplePoint.y)
+                    new Point(rightSamplePoint.x + 20, rightSamplePoint.y),
+                    new Point(rightSamplePoint.x, rightSamplePoint.y + 40)
                 };
 
                 for (Point p : sampleLocs) {
@@ -59,16 +77,41 @@ public class BrightnessDetector {
 
                 if (count > 0) {
                     double avgLum = totalLuminance / count;
-                    boolean light = avgLum > 0.52;
+                    boolean light = avgLum > 0.48;
                     isLightBackground = light;
                     targetFade = light ? 1.0f : 0.0f;
                 }
             } catch (Exception ignored) {}
-        }, 500, 400, TimeUnit.MILLISECONDS);
+        }, 500, 300, TimeUnit.MILLISECONDS);
+    }
+
+    public static void toggleThemeTest() {
+        if (currentMode == ThemeMode.AUTO) {
+            setThemeMode(ThemeMode.FORCE_LIGHT);
+        } else if (currentMode == ThemeMode.FORCE_LIGHT) {
+            setThemeMode(ThemeMode.FORCE_DARK);
+        } else {
+            setThemeMode(ThemeMode.AUTO);
+        }
+    }
+
+    public static void setThemeMode(ThemeMode mode) {
+        currentMode = mode;
+        if (mode == ThemeMode.FORCE_DARK) {
+            isLightBackground = false;
+            targetFade = 0.0f;
+        } else if (mode == ThemeMode.FORCE_LIGHT) {
+            isLightBackground = true;
+            targetFade = 1.0f;
+        }
+    }
+
+    public static ThemeMode getThemeMode() {
+        return currentMode;
     }
 
     public static void updateFade(float delta) {
-        float speed = 0.18f; // fast fade
+        float speed = 0.22f; // fast responsive fade
         currentFade += (targetFade - currentFade) * speed;
         if (Math.abs(targetFade - currentFade) < 0.01f) {
             currentFade = targetFade;
@@ -83,7 +126,6 @@ public class BrightnessDetector {
         return currentFade;
     }
 
-    // Blend between dark theme color (white) and light theme color (black) based on fade
     public static Color getAdaptiveColor(Color darkColor, Color lightColor) {
         float f = Math.clamp(currentFade, 0f, 1f);
         int r = (int) (darkColor.getRed() + f * (lightColor.getRed() - darkColor.getRed()));

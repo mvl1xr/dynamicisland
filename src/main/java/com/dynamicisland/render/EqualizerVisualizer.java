@@ -15,10 +15,10 @@ public class EqualizerVisualizer {
     private final Random random = new Random();
     private Color[] colors;
 
-    private static final float MAX_HEIGHT = 16f;
-    private static final float MIN_HEIGHT = 3f;
-    private static final float BAR_WIDTH = 2.5f;
-    private static final float BAR_GAP = 2.5f;
+    private static final float MAX_HEIGHT = 17.0f;
+    private static final float MIN_HEIGHT = 2.5f;
+    private static final float BAR_WIDTH = 1.8f;
+    private static final float BAR_GAP = 1.4f;
 
     public EqualizerVisualizer() {
         for (int i = 0; i < BAR_COUNT; i++) {

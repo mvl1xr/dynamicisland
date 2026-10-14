@@ -9,6 +9,7 @@ import java.util.Map;
 
 public class FontManager {
     private static Font boldBase;
+    private static Font semiBoldBase;
     private static Font mediumBase;
     private static Font regularBase;
 
@@ -16,6 +17,7 @@ public class FontManager {
 
     static {
         boldBase = loadFont("Nunito-Bold.ttf", Font.BOLD, 14f);
+        semiBoldBase = loadFont("Nunito-SemiBold.ttf", Font.BOLD, 14f);
         mediumBase = loadFont("Nunito-Medium.ttf", Font.PLAIN, 13f);
         regularBase = loadFont("Nunito-Regular.ttf", Font.PLAIN, 13f);
     }
@@ -43,6 +45,11 @@ public class FontManager {
     public static Font getBold(float size) {
         String key = "bold_" + size;
         return fontCache.computeIfAbsent(key, k -> boldBase.deriveFont(Font.BOLD, size));
+    }
+
+    public static Font getSemiBold(float size) {
+        String key = "semibold_" + size;
+        return fontCache.computeIfAbsent(key, k -> semiBoldBase.deriveFont(Font.PLAIN, size));
     }
 
     public static Font getMedium(float size) {

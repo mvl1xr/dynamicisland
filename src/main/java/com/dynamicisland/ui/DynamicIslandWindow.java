@@ -18,7 +18,6 @@ import java.awt.event.MouseEvent;
 
 public class DynamicIslandWindow extends JWindow {
     private final DynamicIslandPanel panel;
-    private Point dragOffset;
 
     public DynamicIslandWindow() {
         panel = new DynamicIslandPanel();
@@ -29,37 +28,41 @@ public class DynamicIslandWindow extends JWindow {
         setType(Type.UTILITY);
 
         int winWidth = 740;
-        int winHeight = 65;
+        int winHeight = 55;
         setSize(winWidth, winHeight);
 
-        // Center at top of primary screen
+        // Fixed static position: pinned at top center of primary display
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
         int posX = (screen.width - winWidth) / 2;
         int posY = 0;
         setLocation(posX, posY);
 
-        // Setup mouse listeners for right click menu & dragging
-        initMouseInteractions(posX, posY);
+        // Setup context menu (Color theme test & notifications)
+        initInteractions();
 
-        // Start brightness detection for left (wifi/airplane) and right (clock) areas
-        Point leftSample = new Point(posX + 70, posY + 25);
-        Point rightSample = new Point(posX + winWidth - 70, posY + 25);
+        // Start brightness detection sampling wallpaper below the window
+        Point leftSample = new Point(posX + 120, posY + 65);
+        Point rightSample = new Point(posX + winWidth - 120, posY + 65);
         BrightnessDetector.startMonitoring(leftSample, rightSample);
     }
 
-    private void initMouseInteractions(int defaultX, int defaultY) {
+    private void initInteractions() {
         JPopupMenu menu = new JPopupMenu();
+
+        JMenuItem themeTestItem = new JMenuItem("Тест цвета: Переключить тему (Светлая / Темная / Авто)");
+        themeTestItem.addActionListener(e -> {
+            BrightnessDetector.toggleThemeTest();
+            BrightnessDetector.ThemeMode mode = BrightnessDetector.getThemeMode();
+            System.out.println("[App] Theme mode toggled to: " + mode);
+        });
+        menu.add(themeTestItem);
 
         JMenuItem testNotifItem = new JMenuItem("Тестовое уведомление");
         testNotifItem.addActionListener(e -> {
-            NotificationInfo testNotif = new NotificationInfo("Telegram", "Дуров", "Привет! Dynamic Island работает идеально", null);
+            NotificationInfo testNotif = new NotificationInfo("Telegram", "Дуров", "Dynamic Island работает отлично", null);
             panel.setNotification(testNotif);
         });
         menu.add(testNotifItem);
-
-        JMenuItem resetPosItem = new JMenuItem("Сбросить позицию (Центр сверху)");
-        resetPosItem.addActionListener(e -> setLocation(defaultX, defaultY));
-        menu.add(resetPosItem);
 
         menu.addSeparator();
 
@@ -72,18 +75,9 @@ public class DynamicIslandWindow extends JWindow {
             public void mousePressed(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
                     menu.show(panel, e.getX(), e.getY());
-                } else if (SwingUtilities.isLeftMouseButton(e)) {
-                    dragOffset = e.getPoint();
-                }
-            }
-        });
-
-        panel.addMouseMotionListener(new MouseAdapter() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                if (dragOffset != null && SwingUtilities.isLeftMouseButton(e)) {
-                    Point current = getLocation();
-                    setLocation(current.x + e.getX() - dragOffset.x, current.y + e.getY() - dragOffset.y);
+                } else if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    // Double click to quickly toggle color theme test
+                    BrightnessDetector.toggleThemeTest();
                 }
             }
         });
