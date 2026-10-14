@@ -16,7 +16,8 @@ public class LiquidGlassRenderer {
         LIQUID_GLASS
     }
 
-    private static BackgroundStyle currentStyle = BackgroundStyle.SOLID_BLACK;
+    // Default to Liquid Glass as requested!
+    private static BackgroundStyle currentStyle = BackgroundStyle.LIQUID_GLASS;
     private static final Map<String, BufferedImage> glassCache = new ConcurrentHashMap<>();
 
     public static BackgroundStyle getBackgroundStyle() {
@@ -38,7 +39,7 @@ public class LiquidGlassRenderer {
     /**
      * Renders the capsule background according to current style:
      * - SOLID_BLACK: pure solid black capsule.
-     * - LIQUID_GLASS: glass refraction, specular highlight gradient, frosted blur, and refractive rim.
+     * - LIQUID_GLASS: pure liquid glass with refraction, specular lighting, and refractive edge.
      */
     public static void renderBackground(Graphics2D g, float x, float y, float w, float h) {
         if (currentStyle == BackgroundStyle.SOLID_BLACK) {
@@ -46,16 +47,15 @@ public class LiquidGlassRenderer {
             RoundRectangle2D.Float capsule = new RoundRectangle2D.Float(x, y, w, h, h, h);
             g.fill(capsule);
 
-            // Subtle dark rim
             g.setColor(new Color(255, 255, 255, 20));
             g.setStroke(new BasicStroke(0.8f));
             g.draw(capsule);
             return;
         }
 
-        // LIQUID GLASS SHADER RENDERING
-        int intW = Math.round(w);
-        int intH = Math.round(h);
+        // PURE LIQUID GLASS SHADER RENDERING
+        int intW = Math.max(10, Math.round(w));
+        int intH = Math.max(10, Math.round(h));
         String key = intW + "x" + intH;
 
         BufferedImage glassImg = glassCache.computeIfAbsent(key, k -> {
@@ -66,38 +66,38 @@ public class LiquidGlassRenderer {
 
             RoundRectangle2D.Float shape = new RoundRectangle2D.Float(0, 0, intW, intH, intH, intH);
 
-            // 1. Frosted dark glass base (translucent refractive tint)
-            g2.setColor(new Color(12, 14, 20, 210));
+            // 1. Pure liquid glass body: sleek dark translucent tint
+            g2.setColor(new Color(15, 17, 24, 185));
             g2.fill(shape);
 
-            // 2. Specular lighting gradient (m2.y lighting from shader)
+            // 2. Liquid specular gloss reflection (from shader rb1 * gradient)
             GradientPaint specGrad = new GradientPaint(
-                0, 0, new Color(255, 255, 255, 75),
-                0, intH * 0.55f, new Color(255, 255, 255, 5)
+                0, 0, new Color(255, 255, 255, 110),
+                0, intH * 0.5f, new Color(255, 255, 255, 15)
             );
             g2.setPaint(specGrad);
             g2.fill(shape);
 
-            // 3. Shadow gradient inside (rb3 from shader)
+            // 3. Shadow / refraction gradient inside bottom (from shader rb3)
             GradientPaint shadowGrad = new GradientPaint(
-                0, intH * 0.6f, new Color(0, 0, 0, 0),
-                0, intH, new Color(0, 0, 0, 95)
+                0, intH * 0.5f, new Color(0, 0, 0, 0),
+                0, intH, new Color(0, 0, 0, 80)
             );
             g2.setPaint(shadowGrad);
             g2.fill(shape);
 
-            // 4. Refractive glass borders (rb2 from shader: border highlight)
+            // 4. Glowing refractive liquid borders (from shader rb2)
             g2.setStroke(new BasicStroke(1.2f));
             GradientPaint borderGrad = new GradientPaint(
-                0, 0, new Color(255, 255, 255, 160),
-                0, intH, new Color(255, 255, 255, 30)
+                0, 0, new Color(255, 255, 255, 190),
+                0, intH, new Color(255, 255, 255, 45)
             );
             g2.setPaint(borderGrad);
             g2.draw(shape);
 
-            // Inner subtle refraction edge
+            // 5. Subtle inner refraction highlight line
             RoundRectangle2D.Float inner = new RoundRectangle2D.Float(1, 1, intW - 2, intH - 2, intH - 2, intH - 2);
-            g2.setColor(new Color(255, 255, 255, 25));
+            g2.setColor(new Color(255, 255, 255, 40));
             g2.setStroke(new BasicStroke(0.6f));
             g2.draw(inner);
 

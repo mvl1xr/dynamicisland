@@ -361,19 +361,37 @@ public class DynamicIslandPanel extends JPanel {
     }
 
     private void drawIdleContent(Graphics2D g, float x, float y, float w, float h, float centerY) {
-        float dotSize = 9f;
-        float sensorW = 11f;
+        // Clean empty capsule without camera or sensor cutouts
+    }
 
-        // Camera lens
-        g.setColor(new Color(18, 18, 22));
-        g.fillOval((int) (x + w - 20f), (int) (centerY - (dotSize / 2f)), (int) dotSize, (int) dotSize);
+    @Override
+    public boolean contains(int x, int y) {
+        float centerX = getWidth() / 2f;
+        float islandW = currentWidth;
+        float islandH = FIXED_HEIGHT;
+        float islandX = centerX - (islandW / 2f);
+        float islandY = 4f;
 
-        // Reflection
-        g.setColor(new Color(25, 30, 50));
-        g.fillOval((int) (x + w - 18f), (int) (centerY - 2.5f), 3, 3);
+        // Inside capsule
+        if (x >= islandX && x <= islandX + islandW && y >= islandY && y <= islandY + islandH) {
+            return true;
+        }
 
-        // Sensor
-        g.setColor(new Color(14, 14, 18));
-        g.fillRoundRect((int) (x + 12f), (int) (centerY - 3f), (int) sensorW, 6, 6, 6);
+        // Left Wi-Fi icon
+        float iconSize = 24f;
+        float startX = islandX - iconSize - 16f;
+        float centerY = islandY + (islandH / 2f);
+        if (x >= startX && x <= startX + iconSize && y >= centerY - (iconSize / 2f) && y <= centerY + (iconSize / 2f)) {
+            return true;
+        }
+
+        // Right clock
+        float textX = islandX + islandW + 16f;
+        if (x >= textX && x <= textX + 55f && y >= centerY - 12f && y <= centerY + 12f) {
+            return true;
+        }
+
+        // Pass-through click to desktop icons/folders!
+        return false;
     }
 }

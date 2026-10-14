@@ -168,7 +168,7 @@ while ($true) {
                         $isTelegram = ($appName -like "*Telegram*")
                         $isSilent = $false
                         if ($isTelegram) {
-                            if ($titleText -like "*🔕*" -or $bodyText -like "*🔕*" -or $titleText -like "*без звука*" -or $bodyText -like "*без звука*" -or $titleText -like "*[Muted]*") {
+                            if ($titleText -match 'muted|silent' -or $bodyText -match 'muted|silent') {
                                 $isSilent = $true
                             }
                             try {
@@ -182,7 +182,7 @@ while ($true) {
                         $isDiscord = ($appName -like "*Discord*")
                         $isMention = $false
                         if ($isDiscord) {
-                            if ($titleText -like "*@*" -or $bodyText -like "*@*" -or $titleText -like "*(DM)*" -or $titleText -like "*упомянул*" -or $bodyText -like "*упомянул*" -or $titleText -notmatch '#') {
+                            if ($titleText -match '@' -or $bodyText -match '@' -or $titleText -match '\(DM\)' -or $titleText -notmatch '#') {
                                 $isMention = $true
                             }
                         }

@@ -28,7 +28,7 @@ public class DynamicIslandWindow extends JWindow {
         setType(Type.UTILITY);
 
         int winWidth = 740;
-        int winHeight = 55;
+        int winHeight = 38;
         setSize(winWidth, winHeight);
 
         // Fixed static position: pinned at top center of primary display
