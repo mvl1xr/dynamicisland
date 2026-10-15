@@ -53,11 +53,20 @@ public class DynamicIslandPanel extends JPanel {
     private float marqueeOffset = 0f;
     private long notificationExpireTime = 0;
 
+    // Dynamic OS Hitbox sync
+    private final DynamicIslandWindow parentWindow;
+    private float lastHitboxWidth = -1f;
+
     // Colors
     private static final Color DARK_THEME_COLOR = Color.WHITE;
     private static final Color LIGHT_THEME_COLOR = new Color(20, 20, 20);
 
     public DynamicIslandPanel() {
+        this(null);
+    }
+
+    public DynamicIslandPanel(DynamicIslandWindow parentWindow) {
+        this.parentWindow = parentWindow;
         setOpaque(false);
         setBackground(new Color(0, 0, 0, 0));
 
@@ -100,6 +109,12 @@ public class DynamicIslandPanel extends JPanel {
             marqueeOffset += 0.5f;
         } else {
             marqueeOffset = 0f;
+        }
+
+        // 7. Sync native OS window hitbox so clicks outside the island pass through to desktop icons
+        if (Math.abs(currentWidth - lastHitboxWidth) > 0.5f || (targetWidth == currentWidth && lastHitboxWidth != currentWidth)) {
+            lastHitboxWidth = currentWidth;
+            updateHitboxBounds();
         }
 
         repaint();
@@ -393,5 +408,34 @@ public class DynamicIslandPanel extends JPanel {
 
         // Pass-through click to desktop icons/folders!
         return false;
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        javax.swing.SwingUtilities.invokeLater(this::updateHitboxBounds);
+    }
+
+    public void updateHitboxBounds() {
+        if (parentWindow == null) return;
+        int panelWidth = getWidth();
+        if (panelWidth <= 0) return;
+
+        float centerX = panelWidth / 2f;
+        float islandY = 4f;
+        float islandW = currentWidth;
+        float islandH = FIXED_HEIGHT;
+        float islandX = centerX - (islandW / 2f);
+
+        float iconSize = 24f;
+        float wifiX = islandX - iconSize - 16f;
+        float wifiY = islandY + (islandH / 2f) - (iconSize / 2f);
+
+        float clockX = islandX + islandW + 16f;
+        float clockY = islandY + (islandH / 2f) - 12f;
+        float clockW = 55f;
+        float clockH = 24f;
+
+        parentWindow.updateHitbox(islandX, islandY, islandW, islandH, wifiX, wifiY, iconSize, clockX, clockY, clockW, clockH);
     }
 }

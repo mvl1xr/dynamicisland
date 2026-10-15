@@ -15,12 +15,14 @@ import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Area;
+import java.awt.geom.RoundRectangle2D;
 
 public class DynamicIslandWindow extends JWindow {
     private final DynamicIslandPanel panel;
 
     public DynamicIslandWindow() {
-        panel = new DynamicIslandPanel();
+        panel = new DynamicIslandPanel(this);
         setContentPane(panel);
 
         setBackground(new Color(0, 0, 0, 0));
@@ -28,7 +30,7 @@ public class DynamicIslandWindow extends JWindow {
         setType(Type.UTILITY);
 
         int winWidth = 740;
-        int winHeight = 38;
+        int winHeight = 44;
         setSize(winWidth, winHeight);
 
         // Fixed static position: pinned at top center of primary display
@@ -44,6 +46,26 @@ public class DynamicIslandWindow extends JWindow {
         Point leftSample = new Point(posX + 120, posY + 65);
         Point rightSample = new Point(posX + winWidth - 120, posY + 65);
         BrightnessDetector.startMonitoring(leftSample, rightSample);
+    }
+
+    /**
+     * Updates native OS window region clipping via setShape (SetWindowRgn)
+     * so that all transparent space outside visible elements passes clicks straight to desktop icons!
+     */
+    public void updateHitbox(float islandX, float islandY, float islandW, float islandH,
+                             float wifiX, float wifiY, float wifiSize,
+                             float clockX, float clockY, float clockW, float clockH) {
+        try {
+            Area hitArea = new Area();
+            // Dynamic Island Capsule shape
+            hitArea.add(new Area(new RoundRectangle2D.Float(islandX, islandY, islandW, islandH, islandH, islandH)));
+            // Left Wi-Fi icon hitbox
+            hitArea.add(new Area(new RoundRectangle2D.Float(wifiX - 2, wifiY - 2, wifiSize + 4, wifiSize + 4, 6f, 6f)));
+            // Right Clock hitbox
+            hitArea.add(new Area(new RoundRectangle2D.Float(clockX - 2, clockY - 2, clockW + 4, clockH + 4, 6f, 6f)));
+
+            setShape(hitArea);
+        } catch (Exception ignored) {}
     }
 
     private void initInteractions() {

@@ -74,15 +74,25 @@ try {
 } catch {}
 
 $lastMediaKey = ""
-$lastNotifId = -1
 $lastWifiLevel = -1
+$seenNotifIds = New-Object 'System.Collections.Generic.HashSet[int]'
 
-# Seed last notification ID so we don't spam old notifications on startup
+# Temporarily suppress Windows native toast sound so only Apple ding.mp3 plays
+$regSoundPath = "HKCU:\AppEvents\Schemes\Apps\.Default\Notification.Default\.Current"
+$origSound = $null
+try {
+    $origSound = (Get-ItemProperty -Path $regSoundPath -ErrorAction SilentlyContinue).'(Default)'
+    Set-ItemProperty -Path $regSoundPath -Name "(Default)" -Value "" -ErrorAction SilentlyContinue
+} catch {}
+
+# Seed existing notifications so we don't display old notifications on startup
 try {
     if ($listener) {
         $existing = AwaitTask ($listener.GetNotificationsAsync([Windows.UI.Notifications.NotificationKinds]::Toast)) ([System.Collections.Generic.IReadOnlyList[Windows.UI.Notifications.UserNotification]])
-        if ($existing -and $existing.Count -gt 0) {
-            $lastNotifId = $existing[$existing.Count - 1].Id
+        if ($existing) {
+            foreach ($item in $existing) {
+                $seenNotifIds.Add($item.Id) | Out-Null
+            }
         }
     }
 } catch {}
@@ -146,8 +156,11 @@ while ($true) {
             $notifs = AwaitTask ($listener.GetNotificationsAsync([Windows.UI.Notifications.NotificationKinds]::Toast)) ([System.Collections.Generic.IReadOnlyList[Windows.UI.Notifications.UserNotification]])
             if ($notifs -and $notifs.Count -gt 0) {
                 foreach ($latest in $notifs) {
-                    if ($latest.Id -gt $lastNotifId) {
-                        $lastNotifId = $latest.Id
+                    if (-not $seenNotifIds.Contains($latest.Id)) {
+                        $seenNotifIds.Add($latest.Id) | Out-Null
+                        if ($seenNotifIds.Count -gt 500) {
+                            $seenNotifIds.Clear()
+                        }
                         $appName = $latest.AppInfo.DisplayInfo.DisplayName
                         $titleText = ""
                         $bodyText = ""
